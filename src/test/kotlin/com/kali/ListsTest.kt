@@ -121,13 +121,83 @@ class ListTest {
     }
 
     private fun <T> decode(list: List<Pair<Int, T>>): List<T> =
-            list.flatMap { p -> List(p.first) { p.second } }
+            list.flatMap { (first, second) -> List(first) { second } }
 
 
     @Test
     fun `12 decode of a list`() {
         val testData = listOf(Pair(4, 'a'), Pair(1, 'b'), Pair(2, 'c'), Pair(2, 'a'), Pair(1, 'd'), Pair(4, 'e'))
         assertThat(decode(testData)).isEqualTo("aaaabccaadeeee".toList())
+    }
+
+    private fun <T> multiply(list: List<T>, k: Int): List<T> = list.flatMap { v -> List(k) { v } }
+
+    @Test
+    fun `14 duplicate elements of a list`() {
+        val testData = "abccd".toList()
+        assertThat(multiply(testData, 2)).isEqualTo("aabbccccdd".toList())
+    }
+
+    @Test
+    fun `15 replicate elements of a list`() {
+        val testData = "abccd".toList()
+        val k = 3
+        assertThat(multiply(testData, k)).isEqualTo("aaabbbccccccddd".toList())
+    }
+
+    private fun <T> dropN(list: List<T>, n: Int): List<T> =
+            list.filterIndexed { index, _ -> (index + 1) % n > 0 }
+
+    @Test
+    fun `16 drop every N`() {
+        val testData = "abcdefghik".toList()
+        val n = 3
+        assertThat(dropN(testData, n)).isEqualTo("abdeghk".toList())
+    }
+
+    private fun <T> split(list: List<T>, k: Int): Pair<List<T>, List<T>> = Pair(list.take(k), list.drop(k))
+
+    @Test
+    fun `17 split at k`() {
+        val testData = "abcdefghik".toList()
+        val k = 3
+        assertThat(split(testData, k)).isEqualTo(Pair("abc".toList(), "defghik".toList()))
+    }
+
+    @Test
+    fun `17 split at k index higher`() {
+        val testData = "a".toList()
+        val k = 4
+        assertThat(split(testData, k)).isEqualTo(Pair(listOf('a'), emptyList<Char>()))
+    }
+
+    @Test
+    fun `18 slice`() {
+        val testData = "abcdefghik)".toList()
+        val i = 3
+        val k = 7
+        assertThat(testData.slice(IntRange(i - 1, k - 1))).isEqualTo("cdefg".toList())
+    }
+
+    private fun <T> rotate(list: List<T>, n: Int): List<T> {
+        if (list.isEmpty()) return emptyList()
+        var k = n % list.size
+        if (k < 0) k += list.size
+        val right = list.take(k)
+        return list.takeLast(list.size - k) + right
+    }
+
+    @Test
+    fun `19 rotate N left`() {
+        val testData = "abcdefgh".toList()
+
+        assertThat(rotate(testData, 3)).isEqualTo("defghabc".toList())
+        assertThat(rotate(testData, 11)).isEqualTo("defghabc".toList())
+        assertThat(rotate(testData, -2)).isEqualTo("ghabcdef".toList())
+        assertThat(rotate(testData, -10)).isEqualTo("ghabcdef".toList())
+        assertThat(rotate(testData, 0)).isEqualTo("abcdefgh".toList())
+        assertThat(rotate(testData, 8)).isEqualTo("abcdefgh".toList())
+        assertThat(rotate(emptyList<Char>(), -2)).isEqualTo(emptyList<Char>())
     }
 }
 
