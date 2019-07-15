@@ -182,9 +182,10 @@ class ListTest {
     private fun <T> rotate(list: List<T>, n: Int): List<T> {
         if (list.isEmpty()) return emptyList()
         var k = n % list.size
-        if (k < 0) k += list.size
-        val right = list.take(k)
-        return list.takeLast(list.size - k) + right
+        if (k < 0) {
+            k += list.size
+        }
+        return list.takeLast(list.size - k) + list.take(k)
     }
 
     @Test
@@ -198,6 +199,74 @@ class ListTest {
         assertThat(rotate(testData, 0)).isEqualTo("abcdefgh".toList())
         assertThat(rotate(testData, 8)).isEqualTo("abcdefgh".toList())
         assertThat(rotate(emptyList<Char>(), -2)).isEqualTo(emptyList<Char>())
+    }
+
+    private fun <T> removeAt(list: List<T>, n: Int): Pair<T, List<T>> =
+            Pair(list[n - 1], list.filterIndexed { i, _ -> (i + 1) != n })
+
+    @Test
+    fun `20 Remove kth element`() {
+        val testData = "abcd".toList()
+        assertThat(removeAt(testData, 2)).isEqualTo(Pair('b', "acd".toList()))
+    }
+
+    private fun <T> insertAt(list: List<T>, element: T, index: Int): List<T> =
+            list.take(index) + element + list.drop(index)
+
+    @Test
+    fun `21 Insert at n`() {
+        val testData = "abcd".toList()
+        val toInsert = 'x'
+        assertThat(insertAt(testData, toInsert, 2)).isEqualTo("abxcd".toList())
+    }
+
+    @Test
+    fun `21 Insert at n were n greater then size`() {
+        val testData = "a".toList()
+        val toInsert = 'x'
+        assertThat(insertAt(testData, toInsert, 5)).isEqualTo("ax".toList())
+    }
+
+    @Test
+    fun `22 Range`() {
+        assertThat((4..9).toList()).isEqualTo(listOf(4, 5, 6, 7, 8, 9))
+    }
+
+    @Test
+    fun `23 Random n`() {
+        val testData = "abcdefgh".toList()
+        val random3 = testData.shuffled().take(3)
+
+        assertThat(random3)
+                .containsAnyElementsOf(testData)
+                .isEqualTo(random3.distinct())
+                .hasSize(3)
+    }
+
+    private fun randomKfromN(n: Int, k: Int): List<Int> {
+        return (1..n)
+                .toList()
+                .shuffled()
+                .take(k)
+    }
+
+    @Test
+    fun `24 Random k from range 1 to n`() {
+        val random = randomKfromN(49, 6)
+
+        assertThat(random)
+                .isEqualTo(random.distinct())
+                .allMatch { v -> v in 1..49 }
+                .hasSize(6)
+    }
+
+    @Test
+    fun `25 Permutation`() {
+        val testData = "abcdefgh".toList()
+
+        assertThat(testData.shuffled())
+                .containsOnlyElementsOf(testData)
+                .isNotEqualTo(testData)
     }
 }
 
