@@ -268,5 +268,91 @@ class ListTest {
                 .containsOnlyElementsOf(testData)
                 .isNotEqualTo(testData)
     }
+
+    private fun <T> combination(list: List<T>, n: Int): List<List<T>> =
+            when {
+                n == 0 || n > list.size -> emptyList()
+                n == 1 -> list.map { l -> listOf(l) }
+                else -> {
+                    list.take(list.size - n + 1)
+                            .mapIndexed { i, t ->
+                                combination(list.drop(i + 1), n - 1)
+                                        .map { listOf(t) + it }
+                            }.flatten()
+                }
+            }
+
+    @Test
+    fun `26 combinations`() {
+        val testData = "abcdef".toList()
+
+        assertThat(combination(testData, 3))
+                .hasSize(20)
+        assertThat(combination(testData, 30))
+                .hasSize(0)
+    }
+
+    private fun <T> combination2(list: List<T>, n: Int): List<List<T>> =
+            if (n == 0) listOf(emptyList())
+            else list.flatMapTails { subList ->
+                combination2(subList.drop(1), n - 1).map { (listOf(subList.first()) + it) }
+            }
+
+    private fun <T> List<T>.flatMapTails(f: (List<T>) -> (List<List<T>>)): List<List<T>> =
+            if (isEmpty()) emptyList()
+            else f(this) + this.drop(1).flatMapTails(f)
+
+    @Test
+    fun `26 combinations2`() {
+        val testData = "abcdef".toList()
+        assertThat(combination2(testData, 3))
+                .isEqualTo(combination(testData, 3))
+    }
+
+    private fun <T> groupIntoDisjointSubsets(list: List<T>, groupSizes: List<Int>): List<List<List<T>>> =
+            if (groupSizes.isEmpty()) listOf(emptyList())
+            else combination(list, groupSizes.first())
+                    .flatMap { t ->
+                        val rest = list.filterNot { t.contains(it) }
+                        groupIntoDisjointSubsets(rest, groupSizes.drop(1))
+                                .map { listOf(t) + it }
+                    }
+
+
+    @Test
+    fun `27 group elements`() {
+        val testData = listOf("aldo", "beat", "carla", "david", "evi", "flip", "gary", "hugo", "ida")
+        assertThat(groupIntoDisjointSubsets(testData, listOf(2, 2, 5))).hasSize(756)
+    }
+
+    private fun <T> lsort(list: List<List<T>>): List<List<T>> =
+            list.sortedBy { it.size }
+
+    @Test
+    fun `28 Sorting a list of lists according to length of sublists`() {
+        val testData = listOf("abc".toList(), "de".toList(), "fgh".toList(), "de".toList(), "ijkl".toList(),
+                "mn".toList(), "o".toList())
+        assertThat(lsort(testData)).isEqualTo(listOf(
+                "o".toList(), "de".toList(), "de".toList(), "mn".toList(), "abc".toList(), "fgh".toList(),
+                "ijkl".toList()))
+    }
+
+    private fun <T> lfsort(list: List<List<T>>): List<List<T>> {
+        val frequencies = list
+                .groupBy { it.size }
+                .mapValues { it.value.size }
+        return list.sortedWith(Comparator { o1, o2 ->
+            frequencies.getValue(o1.size).compareTo(frequencies.getValue(o2.size))
+        })
+    }
+
+    @Test
+    fun `28 Sorting a list of lists according to length frequency of sublists`() {
+        val testData = listOf("abc".toList(), "de".toList(), "fgh".toList(), "de".toList(), "ijkl".toList(),
+                "mn".toList(), "o".toList())
+        assertThat(lfsort(testData)).isEqualTo(listOf(
+                "ijkl".toList(), "o".toList(), "abc".toList(), "fgh".toList(), "de".toList(), "de".toList(),
+                "mn".toList()))
+    }
 }
 
