@@ -118,14 +118,14 @@ class ArithmeticTest {
                 0 -> 0
                 1 -> 1
                 else -> this.primeFactors2()
-                    .map { (it.first - 1) * it.first.toDouble().pow(it.second.toDouble() - 1) }
-                    .reduce { acc: Double, d: Double -> acc * d }
-                    .toInt()
+                        .map { (it.first - 1) * it.first.toDouble().pow(it.second.toDouble() - 1) }
+                        .reduce { acc: Double, d: Double -> acc * d }
+                        .toInt()
             }
 
 
     @Test
-    fun `37 test totient2`() {
+    fun `38 test totient2`() {
         assertThat(1.totient2()).isEqualTo(1.totient())
         assertThat(0.totient2()).isEqualTo(0.totient())
         assertThat(10090.totient2()).isEqualTo(10090.totient())
@@ -142,4 +142,50 @@ class ArithmeticTest {
         assertThat(primeRange(7, 31)).isEqualTo(listOf(7, 11, 13, 17, 19, 23, 29, 31))
     }
 
+    fun Int.goldbach(): Pair<Int, Int>? =
+            when {
+                this % 2 == 1 || this < 4 -> null
+                else -> primeSeq().map { Pair(it, this - it) }
+                        .find { it.second.isPrime() }
+            }
+
+    @Test
+    fun `40 Test goldbach`() {
+        assertThat(listOf(0, 1, 2, 3, 4, 5, 28).map { it.goldbach() })
+                .isEqualTo(listOf(null, null, null, null, Pair(2, 2), null, Pair(5, 23)))
+    }
+
+    fun `printGoldbachList`(from: Int, to: Int) {
+        IntRange(from, to)
+                .map { it.goldbach() }
+                .filterNotNull()
+                .forEach { println("${it.first + it.second} = ${it.first} + ${it.second}") }
+    }
+
+    @Test
+    fun `41 Test goldbach print`() {
+        printGoldbachList(9, 20)
+    }
+
+    fun Int.goldbach(from: Int): Pair<Int, Int>? =
+            when {
+                this % 2 == 1 || this < 4 -> null
+                else -> primeSeq()
+                        .dropWhile { it < from  }
+                        .takeWhile { it + it <= this }
+                        .map { Pair(it, this - it) }
+                        .find { it.second.isPrime() }
+            }
+
+    fun `printGoldbachListLimited`(from: Int, to: Int, limit: Int) {
+        IntRange(from, to)
+                .map { it.goldbach(limit) }
+                .filterNotNull()
+                .forEach { println("${it.first + it.second} = ${it.first} + ${it.second}") }
+    }
+
+    @Test
+    fun `43 Test goldbach print with limit`() {
+        printGoldbachListLimited(1, 2000, 50)
+    }
 }
