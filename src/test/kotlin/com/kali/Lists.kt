@@ -75,14 +75,6 @@ class ListTest {
         assertThat(eliminateConsecutiveDuplicates(testData)).isEqualTo("babdegdoacwu".toList())
     }
 
-    private fun <T> pack(list: List<T>): List<List<T>> =
-            if (list.isEmpty()) {
-                listOf()
-            } else {
-                val first = list.first()
-                val part = list.takeWhile { it == first }
-                listOf(part) + pack(list.drop(part.size))
-            }
 
     @Test
     fun `9 Pack consecutive duplicates of list elements into sublists If a list contains repeated elements they should be placed in separate sublists`() {
@@ -104,20 +96,30 @@ class ListTest {
                 .isEqualTo(listOf(Pair(4, 'a'), Pair(1, 'b'), Pair(2, 'c'), Pair(2, 'a'), Pair(1, 'd'), Pair(4, 'e')))
     }
 
-    private fun <T> encoding2(list: List<T>): List<Any?> {
-        return pack(list).map {
-            when (it.size) {
-                1 -> it.first()
-                else -> Pair(it.size, it.first())
-            }
-        }
+    companion object {
+
+        @JvmStatic
+        fun <T> pack(list: List<T>): List<List<T>> =
+                if (list.isEmpty()) {
+                    listOf()
+                } else {
+                    val first = list.first()
+                    val part = list.takeWhile { it == first }
+                    listOf(part) + pack(list.drop(part.size))
+                }
+
+        @JvmStatic
+        fun <T> encoding2(list: List<T>): List<Pair<T, Int>> =
+                pack(list).map { Pair(it.first(), it.size) }
+
+
     }
 
     @Test
     fun `11 Run-length encoding of a list 2`() {
         val testData = "aaaabccaadeeee".toList()
         assertThat(encoding2(testData))
-                .isEqualTo(listOf(Pair(4, 'a'), 'b', Pair(2, 'c'), Pair(2, 'a'), 'd', Pair(4, 'e')))
+                .isEqualTo(listOf(Pair('a', 4), Pair('b', 1), Pair('c', 2), Pair('a', 2), Pair('d', 1), Pair('e', 4)))
     }
 
     private fun <T> decode(list: List<Pair<Int, T>>): List<T> =
