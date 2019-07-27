@@ -15,6 +15,12 @@ sealed class Tree<out T> {
 
     open fun isMirrorOf(t: Tree<Any?>): Boolean = false
 
+    open fun leafs(): List<Tree<T>> = emptyList()
+
+    open fun leafCount(): Int = leafs().size
+
+    open fun nodeCount(): Int = 0
+
     companion object {
         @JvmStatic
         fun <K> cBalanced(size: Int, value: K): List<Tree<K>> =
@@ -41,8 +47,36 @@ sealed class Tree<out T> {
         fun <K : Comparable<K>> fromList(list: List<K>): Tree<K> =
                 list.fold(End as Tree<K>, { l, r -> l.add(r) })
 
-        fun <K> hbalTrees(height: Int, value: K): List<Tree<K>> =
-                emptyList()
+        @JvmStatic
+        fun <K> hbalTreesWithHeight(height: Int, value: K): List<Tree<K>> =
+                when {
+                    height < 0 -> emptyList()
+                    height == 0 -> listOf(BinaryTreeNode(value))
+                    height == 1 -> listOf(
+                            BinaryTreeNode(value, BinaryTreeNode(value), End),
+                            BinaryTreeNode(value, End, BinaryTreeNode(value)),
+                            BinaryTreeNode(value, BinaryTreeNode(value), BinaryTreeNode(value)))
+                    else -> {
+                        val highTrees = hbalTreesWithHeight(height - 1, value)
+                        val shortTrees = hbalTreesWithHeight(height - 2, value)
+                        highTrees.flatMap { h ->
+                            highTrees.map { r -> BinaryTreeNode(value, h, r) } +
+                                    shortTrees.flatMap { s ->
+                                        listOf(
+                                                BinaryTreeNode(value, h, s),
+                                                BinaryTreeNode(value, s, h))
+                                    }
+                        }
+                    }
+                }
+
+        @JvmStatic
+        fun <K> hbalTreesWithNodes(nodes: Int, value: K): List<Tree<K>> {
+            val minHeight = minHeightBalancedHeight(nodes)
+            val maxHeight = maxHeightBalancedHeight(nodes)
+            return (minHeight..maxHeight).flatMap { hbalTreesWithHeight(it, value) }
+                    .filter { it.nodeCount() == nodes }
+        }
     }
 
     object End : Tree<Nothing>() {
@@ -68,14 +102,20 @@ data class BinaryTreeNode<T>(
 
     override fun height(): Int = max(left.height(), right.height()) + 1
 
-    fun isLeaf(): Boolean = left == End && right == End
-
     override fun isBalanced(): Boolean =
-            abs(left.height() - right.height()) < 1 && left.isBalanced() && right.isBalanced()
+            abs(left.height() - right.height()) <= 1 && left.isBalanced() && right.isBalanced()
+
+    override fun leafs(): List<Tree<T>> =
+            if (isLeaf()) listOf(this)
+            else left.leafs() + right.leafs()
+
+    override fun nodeCount(): Int = left.nodeCount() + right.nodeCount() + 1
 
     override fun toString(): String {
         return "T($value $left $right)"
     }
+
+    fun isLeaf(): Boolean = left == End && right == End
 }
 
 fun <T : Comparable<T>> Tree<T>.add(value: T): Tree<T> =
@@ -87,6 +127,32 @@ fun <T : Comparable<T>> Tree<T>.add(value: T): Tree<T> =
             }
             else -> BinaryTreeNode(value)
         }
+
+fun minHeightBalancedNodes(height: Int): Int =
+        if (height < 0) 0
+        else 1 + minHeightBalancedNodes(height - 1) + minHeightBalancedNodes(height - 2)
+
+
+fun maxHeightBalancedHeight(nodes: Int): Int =
+        if (nodes <= 1) 0
+        else {
+            var height = 0
+            var prev = 1
+            var prev2 = 0
+            do {
+                var count = 1 + prev + prev2
+                prev2 = prev
+                prev = count
+                if (count <= nodes) {
+                    height++
+                }
+            } while (count < nodes)
+            height
+        }
+
+fun minHeightBalancedHeight(nodes: Int): Int =
+        if (nodes <= 1) 0
+        else minHeightBalancedHeight(nodes / 2 - 1) + 1
 
 class BinaryTreeTest {
 
@@ -136,5 +202,76 @@ class BinaryTreeTest {
     fun `58 Generate-and-test paradigm`() {
         assertThat(Tree.symmetricBalancedTrees(5, "x").toString())
                 .isEqualTo("[T(x T(x T(x . .) .) T(x . T(x . .))), T(x T(x . T(x . .)) T(x T(x . .) .))]")
+    }
+
+    @Test
+    fun `59 test height balanced trees`() {
+        assertThat(Tree.hbalTreesWithHeight(-1, "x")).isEmpty()
+        assertThat(Tree.hbalTreesWithHeight(0, "x").toString())
+                .isEqualTo("[T(x . .)]")
+        assertThat(Tree.hbalTreesWithHeight(1, "x").toString())
+                .isEqualTo("[T(x T(x . .) .), T(x . T(x . .)), T(x T(x . .) T(x . .))]")
+        assertThat(Tree.hbalTreesWithHeight(2, "x").filter { !it.isBalanced() }).isEmpty()
+        assertThat(Tree.hbalTreesWithHeight(3, "x").filter { !it.isBalanced() }).isEmpty()
+        assertThat(Tree.hbalTreesWithHeight(3, "x").size).isEqualTo(315)
+        assertThat(Tree.hbalTreesWithHeight(4, "x").size).isEqualTo(108675)
+    }
+
+    @Test
+    fun `60 test min height balanced nodes count`() {
+        assertThat(minHeightBalancedNodes(-1)).isEqualTo(0)
+        assertThat(minHeightBalancedNodes(0)).isEqualTo(1)
+        assertThat(minHeightBalancedNodes(1)).isEqualTo(2)
+        assertThat(minHeightBalancedNodes(2)).isEqualTo(4)
+        assertThat(minHeightBalancedNodes(3)).isEqualTo(7)
+        assertThat(minHeightBalancedNodes(4)).isEqualTo(12)
+        assertThat(minHeightBalancedNodes(5)).isEqualTo(20)
+    }
+
+    @Test
+    fun `60 test max height for balanced tree given nodes count`() {
+        assertThat(maxHeightBalancedHeight(-1)).isEqualTo(0)
+        assertThat(maxHeightBalancedHeight(0)).isEqualTo(0)
+        assertThat(maxHeightBalancedHeight(1)).isEqualTo(0)
+        assertThat(maxHeightBalancedHeight(2)).isEqualTo(1)
+        assertThat(maxHeightBalancedHeight(3)).isEqualTo(1)
+        assertThat(maxHeightBalancedHeight(4)).isEqualTo(2)
+        assertThat(maxHeightBalancedHeight(5)).isEqualTo(2)
+        assertThat(maxHeightBalancedHeight(6)).isEqualTo(2)
+        assertThat(maxHeightBalancedHeight(7)).isEqualTo(3)
+        assertThat(maxHeightBalancedHeight(8)).isEqualTo(3)
+        assertThat(maxHeightBalancedHeight(9)).isEqualTo(3)
+        assertThat(maxHeightBalancedHeight(10)).isEqualTo(3)
+        assertThat(maxHeightBalancedHeight(11)).isEqualTo(3)
+        assertThat(maxHeightBalancedHeight(12)).isEqualTo(4)
+    }
+
+    @Test
+    fun `60 test hbalTreesWithNodes`() {
+        assertThat(Tree.hbalTreesWithNodes(0, 'x')).isEqualTo(emptyList<Char>())
+        assertThat(Tree.hbalTreesWithNodes(1, 'x').size).isEqualTo(1)
+        assertThat(Tree.hbalTreesWithNodes(2, 'x').size).isEqualTo(2)
+        assertThat(Tree.hbalTreesWithNodes(3, 'x').size).isEqualTo(1)
+        assertThat(Tree.hbalTreesWithNodes(4, 'x').size).isEqualTo(4)
+        assertThat(Tree.hbalTreesWithNodes(5, 'x').size).isEqualTo(6)
+        assertThat(Tree.hbalTreesWithNodes(15, 'x').size).isEqualTo(1553)
+    }
+
+    @Test
+    fun `61 test leafs`() {
+        assertThat(Tree.fromList(listOf(5, 3, 18, 1, 4, 12, 21)).leafs())
+                .isEqualTo(listOf(BinaryTreeNode(1), BinaryTreeNode(4), BinaryTreeNode(12), BinaryTreeNode(21)))
+        assertThat(Tree.fromList(listOf(5)).leafs())
+                .isEqualTo(listOf(BinaryTreeNode(5)))
+        assertThat(Tree.fromList(emptyList<Nothing>()).leafs()).isEmpty()
+    }
+
+    @Test
+    fun `61a test leafs COUNT`() {
+        assertThat(Tree.fromList(listOf(5, 3, 18, 1, 4, 12, 21)).leafs())
+                .isEqualTo(listOf(BinaryTreeNode(1), BinaryTreeNode(4), BinaryTreeNode(12), BinaryTreeNode(21)))
+
+        assertThat(Tree.fromList(listOf(5, 3, 18, 1, 4, 12, 21)).leafCount()).isEqualTo(4)
+        assertThat(Tree.fromList(listOf(5)).leafCount()).isEqualTo(1)
     }
 }
