@@ -17,9 +17,15 @@ sealed class Tree<out T> {
 
     open fun leafs(): List<Tree<T>> = emptyList()
 
+    open fun internalNodes(): List<Tree<T>> = emptyList()
+
+    open fun atLevel(level: Int): List<Tree<T>> = emptyList()
+
     open fun leafCount(): Int = leafs().size
 
-    open fun nodeCount(): Int = 0
+    open fun value(): T? = null
+
+    open fun size(): Int = 0
 
     companion object {
         @JvmStatic
@@ -75,7 +81,16 @@ sealed class Tree<out T> {
             val minHeight = minHeightBalancedHeight(nodes)
             val maxHeight = maxHeightBalancedHeight(nodes)
             return (minHeight..maxHeight).flatMap { hbalTreesWithHeight(it, value) }
-                    .filter { it.nodeCount() == nodes }
+                    .filter { it.size() == nodes }
+        }
+
+        @JvmStatic
+        fun <K> completeBinaryTree(nodes: Int, value: K): Tree<K> {
+            fun generateTree(address: Int): Tree<K> =
+                    if (address > nodes) End
+                    else BinaryTreeNode(value, generateTree(2 * address), generateTree(2 * address + 1))
+
+            return generateTree(1)
         }
     }
 
@@ -88,7 +103,7 @@ sealed class Tree<out T> {
     }
 }
 
-data class BinaryTreeNode<T>(
+open class BinaryTreeNode<T>(
         val value: T,
         var left: Tree<T> = End,
         var right: Tree<T> = End
@@ -109,13 +124,54 @@ data class BinaryTreeNode<T>(
             if (isLeaf()) listOf(this)
             else left.leafs() + right.leafs()
 
-    override fun nodeCount(): Int = left.nodeCount() + right.nodeCount() + 1
+    override fun internalNodes(): List<Tree<T>> =
+            if (isLeaf()) emptyList()
+            else listOf(this) + left.internalNodes() + right.internalNodes()
 
-    override fun toString(): String {
-        return "T($value $left $right)"
-    }
+    override fun atLevel(level: Int): List<Tree<T>> =
+            when {
+                level < 0 -> emptyList()
+                level == 0 -> listOf(this)
+                else -> left.atLevel(level - 1) + right.atLevel(level - 1)
+            }
+
+    override fun value(): T? = value
+
+    override fun size(): Int = left.size() + right.size() + 1
+
+    override fun toString(): String = "T($value $left $right)"
 
     fun isLeaf(): Boolean = left == End && right == End
+
+    fun layoutTree1(): PositionedBinaryTreeNode<T> {
+        fun doLayout(x: Int, y: Int, t: BinaryTreeNode<T>): PositionedBinaryTreeNode<T> {
+            val left = if (t.left is BinaryTreeNode<T>) doLayout(x, y + 1, t.left as BinaryTreeNode<T>) else End
+            val xLeftAdjusted = t.left.size() + x
+            val right = if (t.right is BinaryTreeNode<T>) doLayout(xLeftAdjusted + 1, y + 1, t.right as BinaryTreeNode<T>) else End
+            return PositionedBinaryTreeNode(t.value, left, right, xLeftAdjusted, y)
+        }
+        return doLayout(0, 0, this)
+    }
+
+ /*   fun layoutTree2(): PositionedBinaryTreeNode<T> {
+        fun doLayout(h: Int, x: Int, y: Int, t: BinaryTreeNode<T>): PositionedBinaryTreeNode<T> {
+            if (t.isLeaf()) return PositionedBinaryTreeNode(t.value, t.left, t.right, x, y)
+            else {
+                
+            }
+        }
+        return doLayout(0, 0, this)
+    }*/
+}
+
+class PositionedBinaryTreeNode<T>(
+        value: T,
+        left: Tree<T> = End,
+        right: Tree<T> = End,
+        var x: Int,
+        var y: Int) : BinaryTreeNode<T>(value, left, right) {
+
+    override fun toString(): String = "T[$x, $y]($value $left $right)"
 }
 
 fun <T : Comparable<T>> Tree<T>.add(value: T): Tree<T> =
@@ -273,5 +329,37 @@ class BinaryTreeTest {
 
         assertThat(Tree.fromList(listOf(5, 3, 18, 1, 4, 12, 21)).leafCount()).isEqualTo(4)
         assertThat(Tree.fromList(listOf(5)).leafCount()).isEqualTo(1)
+    }
+
+    @Test
+    fun `62 test internal nodes`() {
+        assertThat(Tree.fromList(listOf(5, 3, 18, 1, 4, 12, 21)).internalNodes().map { it.value()!! })
+                .isEqualTo(listOf(5, 3, 18))
+        assertThat(Tree.fromList(listOf(5)).internalNodes()).isEmpty()
+        assertThat(Tree.fromList(emptyList<Nothing>()).internalNodes()).isEmpty()
+    }
+
+    @Test
+    fun `62b test nodes at level`() {
+        assertThat(BinaryTreeNode('a', BinaryTreeNode('b'), BinaryTreeNode('c', BinaryTreeNode('d'), BinaryTreeNode('e'))).atLevel(2).map { it.value()!! })
+                .isEqualTo(listOf('d', 'e'))
+
+        assertThat(Tree.fromList(listOf(5, 3, 18, 1, 4, 12, 21)).leafCount()).isEqualTo(4)
+        assertThat(Tree.fromList(listOf(5)).leafCount()).isEqualTo(1)
+    }
+
+    @Test
+    fun `63 test complete binary tree`() {
+        assertThat(Tree.completeBinaryTree(6, 'x')).isEqualTo(
+                BinaryTreeNode('x', BinaryTreeNode('x', BinaryTreeNode('x'), BinaryTreeNode('x')),
+                        BinaryTreeNode('x', BinaryTreeNode('x'), Tree.End)))
+    }
+
+    @Test
+    fun `64 test layout1`() {
+        assertThat(BinaryTreeNode('a',
+                BinaryTreeNode('b', Tree.End, BinaryTreeNode('c')),
+                BinaryTreeNode('d')).layoutTree1().toString()).isEqualTo(
+                "T[2, 0](a T[0, 1](b . T[1, 2](c . .)) T[3, 1](d . .))")
     }
 }
