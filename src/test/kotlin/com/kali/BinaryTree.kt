@@ -108,7 +108,25 @@ open class BinaryTreeNode<T>(
         var left: Tree<T> = End,
         var right: Tree<T> = End
 ) : Tree<T>() {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
 
+        other as BinaryTreeNode<*>
+
+        if (value != other.value) return false
+        if (left != other.left) return false
+        if (right != other.right) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = value?.hashCode() ?: 0
+        result = 31 * result + left.hashCode()
+        result = 31 * result + right.hashCode()
+        return result
+    }
     override fun isSymmetric(): Boolean = left.isMirrorOf(right)
 
     override fun isMirrorOf(t: Tree<Any?>): Boolean =
@@ -153,15 +171,18 @@ open class BinaryTreeNode<T>(
         return doLayout(0, 0, this)
     }
 
- /*   fun layoutTree2(): PositionedBinaryTreeNode<T> {
-        fun doLayout(h: Int, x: Int, y: Int, t: BinaryTreeNode<T>): PositionedBinaryTreeNode<T> {
-            if (t.isLeaf()) return PositionedBinaryTreeNode(t.value, t.left, t.right, x, y)
-            else {
-                
-            }
-        }
-        return doLayout(0, 0, this)
-    }*/
+
+
+
+    /*   fun layoutTree2(): PositionedBinaryTreeNode<T> {
+           fun doLayout(h: Int, x: Int, y: Int, t: BinaryTreeNode<T>): PositionedBinaryTreeNode<T> {
+               if (t.isLeaf()) return PositionedBinaryTreeNode(t.value, t.left, t.right, x, y)
+               else {
+
+               }
+           }
+           return doLayout(0, 0, this)
+       }*/
 }
 
 class PositionedBinaryTreeNode<T>(
@@ -172,6 +193,28 @@ class PositionedBinaryTreeNode<T>(
         var y: Int) : BinaryTreeNode<T>(value, left, right) {
 
     override fun toString(): String = "T[$x, $y]($value $left $right)"
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+        if (!super.equals(other)) return false
+
+        other as PositionedBinaryTreeNode<*>
+
+        if (x != other.x) return false
+        if (y != other.y) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = super.hashCode()
+        result = 31 * result + x
+        result = 31 * result + y
+        return result
+    }
+
+
 }
 
 fun <T : Comparable<T>> Tree<T>.add(value: T): Tree<T> =
