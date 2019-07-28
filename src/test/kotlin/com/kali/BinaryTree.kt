@@ -4,6 +4,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.pow
 
 sealed class Tree<out T> {
@@ -29,6 +30,8 @@ sealed class Tree<out T> {
     open fun size(): Int = 0
 
     open fun toString2() = ""
+
+    open fun bounds(): List<Pair<Int, Int>> = emptyList()
 
     companion object {
         @JvmStatic
@@ -101,23 +104,21 @@ sealed class Tree<out T> {
             fun extractChildren(str: String): Pair<String, String> {
                 var open = 0
                 for ((index, c) in str.withIndex()) {
-                    when (c) {
-                        '(' -> open++
-                        ')' -> open--
-                        else -> if (c == ',' && open == 0) {
-                            return Pair(str.substring(0, index), str.substring(index + 1))
-                        }
-                    }
+                    if (c == '{') open++
+                    else if (c == ')') open--
+                    else if (c == ',' && open == 0)
+                        return Pair(str.substring(0, index), str.substring(index + 1))
                 }
                 return Pair("", "")
             }
+
             return when {
                 str.isBlank() -> End
                 str.endsWith(")") -> {
                     val value = str.substringBefore('(')
-                    val interior = str.dropLast(1).substring(value.length + 1)
-                    val children = extractChildren(interior)
-                    BinaryTreeNode(value, fromString2(children.first), fromString2(children.second))
+                    val interiorStr = str.dropLast(1).substring(value.length + 1)
+                    val (left, right) = extractChildren(interiorStr)
+                    BinaryTreeNode(value, fromString2(left), fromString2(right))
                 }
                 else -> BinaryTreeNode(str)
             }
@@ -131,6 +132,19 @@ sealed class Tree<out T> {
         override fun height(): Int = -1
         override fun toString() = "."
     }
+}
+
+fun <T1 : Any, T2 : Any> List<T1>.zipAll(other: List<T2>, emptyValue: T1, otherEmptyValue: T2): List<Pair<T1, T2>> {
+    val i1 = this.iterator()
+    val i2 = other.iterator()
+    return generateSequence {
+        if (i1.hasNext() || i2.hasNext()) {
+            Pair(if (i1.hasNext()) i1.next() else emptyValue,
+                    if (i2.hasNext()) i2.next() else otherEmptyValue)
+        } else {
+            null
+        }
+    }.toList()
 }
 
 open class BinaryTreeNode<T>(
@@ -207,32 +221,63 @@ open class BinaryTreeNode<T>(
         fun doLayout(h: Int, x: Int, y: Int, t: BinaryTreeNode<T>): PositionedBinaryTreeNode<T> {
             val xByHeightAdjust = if (h == 0) 0 else 2.0.pow(h - 1).toInt()
             val xLeftAdjusted = if (x - xByHeightAdjust > 0) x - xByHeightAdjust else 0
-
-            val left = if (t.left is BinaryTreeNode<T>) doLayout(h - 1, xLeftAdjusted, y + 1, t.left as BinaryTreeNode<T>) else End
+            val leftNode = t.left
+            val left = if (leftNode is BinaryTreeNode<T>) doLayout(h - 1, xLeftAdjusted, y + 1, leftNode) else End
 
             val xAdjusted = if (left is PositionedBinaryTreeNode<T>) left.x + xByHeightAdjust else x
-
-            val right = if (t.right is BinaryTreeNode<T>) doLayout(h - 1, xAdjusted + xByHeightAdjust, y + 1, t.right as BinaryTreeNode<T>) else End
+            val rightNode = t.right
+            val right = if (rightNode is BinaryTreeNode<T>) doLayout(h - 1, xAdjusted + xByHeightAdjust, y + 1, rightNode) else End
 
             return PositionedBinaryTreeNode(t.value, left, right, xAdjusted, y)
         }
         return doLayout(height(), 0, 0, this)
     }
 
-    fun layoutTree3(): PositionedBinaryTreeNode<T> {
-        fun doLayout(h: Int, x: Int, y: Int, t: BinaryTreeNode<T>): PositionedBinaryTreeNode<T> {
-            val xByHeightAdjust = if (h == 0) 0 else 2.0.pow(h - 1).toInt()
-            val xLeftAdjusted = if (x - xByHeightAdjust > 0) x - xByHeightAdjust else 0
+    override fun bounds(): List<Pair<Int, Int>> {
+        val (leftBounds, rightBounds) = Pair(left.bounds(), right.bounds())
+        val bounds = when {
+            leftBounds.isEmpty() && rightBounds.isEmpty() -> emptyList()
+            rightBounds.isEmpty() -> leftBounds.map { Pair(it.first - 1, it.second - 1) }
+            leftBounds.isEmpty() -> rightBounds.map { Pair(it.first + 1, it.second + 1) }
+            else -> {
+                val shift = leftBounds
+                        .zip(rightBounds)
+                        .map { (it.first.second - it.second.first) / 2 + 1 }
+                        .reduce { l, r -> max(l, r) }
 
-            val left = if (t.left is BinaryTreeNode<T>) doLayout(h - 1, xLeftAdjusted, y + 1, t.left as BinaryTreeNode<T>) else End
+                val empty = Pair(null, null)
 
-            val xAdjusted = if (left is PositionedBinaryTreeNode<T>) left.x + xByHeightAdjust else x
-
-            val right = if (t.right is BinaryTreeNode<T>) doLayout(h - 1, xAdjusted + xByHeightAdjust, y + 1, t.right as BinaryTreeNode<T>) else End
-
-            return PositionedBinaryTreeNode(t.value, left, right, xAdjusted, y)
+                leftBounds.zipAll(rightBounds, empty, empty)
+                        .map { (left, right) ->
+                            when {
+                                right == empty -> Pair((left.first!! - shift), (left.second!! - shift))
+                                left == empty -> Pair((right.first!! + shift), (right.second!! + shift))
+                                else -> Pair((left.first!! - shift), (right.second!! + shift))
+                            }
+                        }
+            }
         }
-        return doLayout(height(), 0, 0, this)
+        return listOf(Pair(0, 0)) + bounds
+    }
+
+    fun compactLayout(): PositionedBinaryTreeNode<T> {
+        fun doLayout(x: Int, y: Int, t: BinaryTreeNode<T>): PositionedBinaryTreeNode<T> =
+                if (t.isLeaf()) PositionedBinaryTreeNode(t.value, End, End, x, y)
+                else {
+                    val (bLeft, bRight) = t.bounds()[1]
+                    val leftNode = t.left
+                    val left = if (leftNode is BinaryTreeNode<T>) doLayout(x + bLeft, y + 1, leftNode) else End
+
+                    val rightNode = t.right
+                    val right = if (rightNode is BinaryTreeNode<T>) doLayout(x + bRight, y + 1, rightNode) else End
+                    PositionedBinaryTreeNode(t.value, left, right, x, y)
+                }
+
+        val x = this.bounds()
+                .map { it.first }
+                .reduce { l, r -> min(l, r) }
+
+        return doLayout(abs(x), 0, this)
     }
 }
 
@@ -466,6 +511,16 @@ class BinaryTreeTest {
 
         assertThat((Tree.fromList(listOf('n', 'k', 'm', 'c', 'a', 'e', 'd', 'g', 'u', 'p', 'q')) as BinaryTreeNode<Char>).layoutTree2().toString())
                 .isEqualTo("T[14, 0](n T[6, 1](k T[2, 2](c T[0, 3](a . .) T[4, 3](e T[3, 4](d . .) T[5, 4](g . .))) T[10, 2](m . .)) T[22, 1](u T[18, 2](p . T[20, 3](q . .)) .))")
+    }
+
+    @Test
+    fun `66 test compact layout`() {
+        val testTree = BinaryTreeNode("a", BinaryTreeNode("b", Tree.End, BinaryTreeNode("c")), BinaryTreeNode("d"))
+        assertThat(testTree.compactLayout().toString())
+                .isEqualTo("T[1, 0](a T[0, 1](b . T[1, 2](c . .)) T[2, 1](d . .))")
+
+        assertThat((Tree.fromList(listOf('n', 'k', 'm', 'c', 'a', 'e', 'd', 'g', 'u', 'p', 'q')) as BinaryTreeNode<Char>).compactLayout().toString())
+                .isEqualTo("T[4, 0](n T[2, 1](k T[1, 2](c T[0, 3](a . .) T[2, 3](e T[1, 4](d . .) T[3, 4](g . .))) T[3, 2](m . .)) T[6, 1](u T[5, 2](p . T[6, 3](q . .)) .))")
     }
 
     @Test
