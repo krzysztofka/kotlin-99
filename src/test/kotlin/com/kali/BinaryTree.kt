@@ -4,6 +4,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.pow
 
 sealed class Tree<out T> {
 
@@ -26,6 +27,8 @@ sealed class Tree<out T> {
     open fun value(): T? = null
 
     open fun size(): Int = 0
+
+    open fun toString2() = ""
 
     companion object {
         @JvmStatic
@@ -92,6 +95,33 @@ sealed class Tree<out T> {
 
             return generateTree(1)
         }
+
+        @JvmStatic
+        fun fromString2(str: String): Tree<String> {
+            fun extractChildren(str: String): Pair<String, String> {
+                var open = 0
+                for ((index, c) in str.withIndex()) {
+                    when (c) {
+                        '(' -> open++
+                        ')' -> open--
+                        else -> if (c == ',' && open == 0) {
+                            return Pair(str.substring(0, index), str.substring(index + 1))
+                        }
+                    }
+                }
+                return Pair("", "")
+            }
+            return when {
+                str.isBlank() -> End
+                str.endsWith(")") -> {
+                    val value = str.substringBefore('(')
+                    val interior = str.dropLast(1).substring(value.length + 1)
+                    val children = extractChildren(interior)
+                    BinaryTreeNode(value, fromString2(children.first), fromString2(children.second))
+                }
+                else -> BinaryTreeNode(str)
+            }
+        }
     }
 
     object End : Tree<Nothing>() {
@@ -127,6 +157,7 @@ open class BinaryTreeNode<T>(
         result = 31 * result + right.hashCode()
         return result
     }
+
     override fun isSymmetric(): Boolean = left.isMirrorOf(right)
 
     override fun isMirrorOf(t: Tree<Any?>): Boolean =
@@ -158,6 +189,7 @@ open class BinaryTreeNode<T>(
     override fun size(): Int = left.size() + right.size() + 1
 
     override fun toString(): String = "T($value $left $right)"
+    override fun toString2(): String = if (isLeaf()) "$value" else "$value(${left.toString2()},${right.toString2()})"
 
     fun isLeaf(): Boolean = left == End && right == End
 
@@ -171,18 +203,37 @@ open class BinaryTreeNode<T>(
         return doLayout(0, 0, this)
     }
 
+    fun layoutTree2(): PositionedBinaryTreeNode<T> {
+        fun doLayout(h: Int, x: Int, y: Int, t: BinaryTreeNode<T>): PositionedBinaryTreeNode<T> {
+            val xByHeightAdjust = if (h == 0) 0 else 2.0.pow(h - 1).toInt()
+            val xLeftAdjusted = if (x - xByHeightAdjust > 0) x - xByHeightAdjust else 0
 
+            val left = if (t.left is BinaryTreeNode<T>) doLayout(h - 1, xLeftAdjusted, y + 1, t.left as BinaryTreeNode<T>) else End
 
+            val xAdjusted = if (left is PositionedBinaryTreeNode<T>) left.x + xByHeightAdjust else x
 
-    /*   fun layoutTree2(): PositionedBinaryTreeNode<T> {
-           fun doLayout(h: Int, x: Int, y: Int, t: BinaryTreeNode<T>): PositionedBinaryTreeNode<T> {
-               if (t.isLeaf()) return PositionedBinaryTreeNode(t.value, t.left, t.right, x, y)
-               else {
+            val right = if (t.right is BinaryTreeNode<T>) doLayout(h - 1, xAdjusted + xByHeightAdjust, y + 1, t.right as BinaryTreeNode<T>) else End
 
-               }
-           }
-           return doLayout(0, 0, this)
-       }*/
+            return PositionedBinaryTreeNode(t.value, left, right, xAdjusted, y)
+        }
+        return doLayout(height(), 0, 0, this)
+    }
+
+    fun layoutTree3(): PositionedBinaryTreeNode<T> {
+        fun doLayout(h: Int, x: Int, y: Int, t: BinaryTreeNode<T>): PositionedBinaryTreeNode<T> {
+            val xByHeightAdjust = if (h == 0) 0 else 2.0.pow(h - 1).toInt()
+            val xLeftAdjusted = if (x - xByHeightAdjust > 0) x - xByHeightAdjust else 0
+
+            val left = if (t.left is BinaryTreeNode<T>) doLayout(h - 1, xLeftAdjusted, y + 1, t.left as BinaryTreeNode<T>) else End
+
+            val xAdjusted = if (left is PositionedBinaryTreeNode<T>) left.x + xByHeightAdjust else x
+
+            val right = if (t.right is BinaryTreeNode<T>) doLayout(h - 1, xAdjusted + xByHeightAdjust, y + 1, t.right as BinaryTreeNode<T>) else End
+
+            return PositionedBinaryTreeNode(t.value, left, right, xAdjusted, y)
+        }
+        return doLayout(height(), 0, 0, this)
+    }
 }
 
 class PositionedBinaryTreeNode<T>(
@@ -239,7 +290,7 @@ fun maxHeightBalancedHeight(nodes: Int): Int =
             var prev = 1
             var prev2 = 0
             do {
-                var count = 1 + prev + prev2
+                val count = 1 + prev + prev2
                 prev2 = prev
                 prev = count
                 if (count <= nodes) {
@@ -405,4 +456,34 @@ class BinaryTreeTest {
                 BinaryTreeNode('d')).layoutTree1().toString()).isEqualTo(
                 "T[2, 0](a T[0, 1](b . T[1, 2](c . .)) T[3, 1](d . .))")
     }
+
+    @Test
+    fun `65 test layout2`() {
+        assertThat(BinaryTreeNode('a',
+                BinaryTreeNode('b', Tree.End, BinaryTreeNode('c')),
+                BinaryTreeNode('d')).layoutTree2().toString()).isEqualTo(
+                "T[2, 0](a T[0, 1](b . T[1, 2](c . .)) T[4, 1](d . .))")
+
+        assertThat((Tree.fromList(listOf('n', 'k', 'm', 'c', 'a', 'e', 'd', 'g', 'u', 'p', 'q')) as BinaryTreeNode<Char>).layoutTree2().toString())
+                .isEqualTo("T[14, 0](n T[6, 1](k T[2, 2](c T[0, 3](a . .) T[4, 3](e T[3, 4](d . .) T[5, 4](g . .))) T[10, 2](m . .)) T[22, 1](u T[18, 2](p . T[20, 3](q . .)) .))")
+    }
+
+    @Test
+    fun `67 test toString2`() {
+        val testData = BinaryTreeNode('a',
+                BinaryTreeNode('b', BinaryTreeNode('d'), BinaryTreeNode('e')),
+                BinaryTreeNode('c', Tree.End, BinaryTreeNode('f', BinaryTreeNode('g'), Tree.End)))
+
+        assertThat(testData.toString2()).isEqualTo("a(b(d,e),c(,f(g,)))")
+    }
+
+    @Test
+    fun `67 test fromString2`() {
+        val testData = BinaryTreeNode("a",
+                BinaryTreeNode("b", BinaryTreeNode("d"), BinaryTreeNode("e")),
+                BinaryTreeNode("c", Tree.End, BinaryTreeNode("f", BinaryTreeNode("g"), Tree.End)))
+
+        assertThat(Tree.fromString2("a(b(d,e),c(,f(g,)))")).isEqualTo(testData)
+    }
+
 }
