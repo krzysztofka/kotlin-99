@@ -31,6 +31,8 @@ sealed class Tree<out T> {
 
     open fun toString2() = ""
 
+    open fun toDotString() = ""
+
     open fun bounds(): List<Pair<Int, Int>> = emptyList()
 
     companion object {
@@ -104,24 +106,41 @@ sealed class Tree<out T> {
             fun extractChildren(str: String): Pair<String, String> {
                 var open = 0
                 for ((index, c) in str.withIndex()) {
-                    if (c == '{') open++
-                    else if (c == ')') open--
-                    else if (c == ',' && open == 0)
-                        return Pair(str.substring(0, index), str.substring(index + 1))
+                    when (c) {
+                        '(' -> open++
+                        ')' -> open--
+                        else -> if (c == ',' && open == 0) {
+                            return Pair(str.substring(0, index), str.substring(index + 1))
+                        }
+                    }
                 }
                 return Pair("", "")
             }
-
             return when {
                 str.isBlank() -> End
                 str.endsWith(")") -> {
                     val value = str.substringBefore('(')
-                    val interiorStr = str.dropLast(1).substring(value.length + 1)
-                    val (left, right) = extractChildren(interiorStr)
-                    BinaryTreeNode(value, fromString2(left), fromString2(right))
+                    val interior = str.dropLast(1).substring(value.length + 1)
+                    val children = extractChildren(interior)
+                    BinaryTreeNode(value, fromString2(children.first), fromString2(children.second))
                 }
                 else -> BinaryTreeNode(str)
             }
+        }
+
+        @JvmStatic
+        fun fromDotString(str: String): Tree<Char> {
+            fun readElementAndRest(str: String): Pair<Tree<Char>, String> {
+                val value = str.first()
+                return if (value == '.') Pair(End, str.drop(1))
+                else {
+                    val leftWithRest = readElementAndRest(str.drop(1))
+                    val rightWithRest = readElementAndRest(leftWithRest.second)
+                    Pair(BinaryTreeNode(value, leftWithRest.first, rightWithRest.first), rightWithRest.second)
+                }
+            }
+
+            return if (str.isNotBlank()) readElementAndRest(str).first else End
         }
     }
 
@@ -131,6 +150,7 @@ sealed class Tree<out T> {
         override fun isBalanced(): Boolean = true
         override fun height(): Int = -1
         override fun toString() = "."
+        override fun toDotString() = "."
     }
 }
 
@@ -204,6 +224,7 @@ open class BinaryTreeNode<T>(
 
     override fun toString(): String = "T($value $left $right)"
     override fun toString2(): String = if (isLeaf()) "$value" else "$value(${left.toString2()},${right.toString2()})"
+    override fun toDotString(): String = "$value${left.toDotString()}${right.toDotString()}"
 
     fun isLeaf(): Boolean = left == End && right == End
 
@@ -309,8 +330,6 @@ class PositionedBinaryTreeNode<T>(
         result = 31 * result + y
         return result
     }
-
-
 }
 
 fun <T : Comparable<T>> Tree<T>.add(value: T): Tree<T> =
@@ -539,6 +558,23 @@ class BinaryTreeTest {
                 BinaryTreeNode("c", Tree.End, BinaryTreeNode("f", BinaryTreeNode("g"), Tree.End)))
 
         assertThat(Tree.fromString2("a(b(d,e),c(,f(g,)))")).isEqualTo(testData)
+    }
+
+    @Test
+    fun `69 test toDotString`() {
+        val testData = BinaryTreeNode('a',
+                BinaryTreeNode('b', BinaryTreeNode('d'), BinaryTreeNode('e')),
+                BinaryTreeNode('c', Tree.End, BinaryTreeNode('f', BinaryTreeNode('g'), Tree.End)))
+
+        assertThat(testData.toDotString()).isEqualTo("abd..e..c.fg...")
+    }
+
+    @Test
+    fun `69 test fromDotString`() {
+        assertThat(Tree.fromDotString("abd..e..c.fg...")).isEqualTo(
+                BinaryTreeNode('a',
+                BinaryTreeNode('b', BinaryTreeNode('d'), BinaryTreeNode('e')),
+                BinaryTreeNode('c', Tree.End, BinaryTreeNode('f', BinaryTreeNode('g'), Tree.End))))
     }
 
 }
